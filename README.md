@@ -1,5 +1,5 @@
 This repository contains files that model an explicit dynamic FEM in both a 1D and 2D implementation.
-Both the 1D and 2D implementations have a fixed boundary condition on the left side, and an applied
+Both the 1D and 2D implementations are initialized with a fixed boundary condition on the left side, and an applied
 force on the right side, introducing axial compression into the system. 
 
 The 1D code is just a series of bar elements. The 2D code is discretized as a quad lattice with
