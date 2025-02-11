@@ -12,10 +12,10 @@ from plot_animation_functions import animate_displacement_2d, plot_displacement_
 from time_integration import time_step
 
 ###### MAIN SCRIPT ######
-nx = 100 # number of elements in x
+nx = 20 # number of elements in x
 ny = 2 # number of elements in y
-total_length_x = 100.0 # length of structure in x (m)
-total_length_y = 2.0 # length of structure in y (m)
+total_length_x = 20.0 # length of structure in x (mm)
+total_length_y = 2.0 # length of structure in y (mm)
 nnode, ndof, coord, connec, dof_id = geometry_2d(nx, ny, total_length_x, total_length_y)
 nele = len(connec)
 #print(nele)
@@ -24,9 +24,9 @@ nele = len(connec)
 #print('dof_id =',dof_id)
 
 # material properties
-E1 = 3.0        # Young's Modulus (Pa)
-A1 = 2.0        # Area (m^2)
-rho = 0.8       # Density (kg/m^3)
+E1 = 30000.0        # Young's Modulus (MPa)
+A1 = 0.0789       # Area (mm^2)
+rho = 2.4e-6       # Density (kg/mm^3)
 Es = np.full(len(connec), E1)   # assign E1 to all elements (Pa)
 As = np.full(len(connec), A1)   # assign A1 to all elements (m^2)
 
@@ -37,7 +37,7 @@ B_dof = np.hstack([2 * B_2d, 2 * B_2d + 1]) # x and y DOFS for all nodes at x = 
 
 # externally applied force function
 right_side_nodes = np.where(np.isclose(coord[:, 0], total_length_x))[0]
-force_value = -1.0 # applied force (N)
+force_value = -200.0 # applied force (N)
 
 # compute lumped global mass matrix
 M = lumped_mass_matrix(rho, As, coord, nele, ndof, connec, dof_id) # mass matrix (Kg)
@@ -54,14 +54,14 @@ F_int = internal_force_2d(U, Es, As, coord, ndof, nele, connec, dof_id) # intern
 a = (F_ext - F_int) / M # acceleration (m/s^2)
 
 # boundary conditions at time = 0
-U[B_2d] = 0.0                  # displacement (m)
-a[B_2d] = 0.0                  # velocity (m/s)
-V_half[B_2d] = 0.0             # acceleration (m/s^2)
+U[B_2d] = 0.0                  # displacement (mm)
+a[B_2d] = 0.0                  # acceleration (mm/s^2)
+V_half[B_2d] = 0.0             # velocity at n - 1/2 (mm/s)
 
 # timestep parameters
 dt_crit = time_step(Es, As, coord, nele, connec, rho) # critical time step (s)
 dt = dt_crit * 0.8 # scale critical timestep for stabilization (s)
-T_total = 1000 # total simulation time (s)
+T_total = 0.001 # total simulation time (s)
 num_steps = int(T_total / dt) # number of time steps
 
 # display time integration parameters for Lattice FEM simulation
