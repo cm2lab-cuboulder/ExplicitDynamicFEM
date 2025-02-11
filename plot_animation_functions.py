@@ -1,6 +1,7 @@
 import numpy as np
 import matplotlib.pyplot as plt
 from matplotlib.animation import FuncAnimation
+import matplotlib.animation as animation
 from matplotlib.collections import LineCollection
 import matplotlib.cm as cm
 from mpl_toolkits.axes_grid1 import make_axes_locatable
@@ -343,6 +344,11 @@ def animate_displacement_2d(coord, connec, U_history, scale_factor, time_array, 
 
         return line_collection, time_text
 
+
     ani = FuncAnimation(fig, update, frames=range(U_history.shape[1]), blit=False, interval=interval)
-    ani.save('lattice_displacement_animation.mp4', writer='ffmpeg', fps=10/interval)
+    
+    Writer = animation.writers['ffmpeg']
+    writer = Writer(fps=10, metadata=dict(artist='Me'), bitrate=1800, extra_args=['-vcodec', 'libx264'])
+
+    ani.save('lattice_displacement_animation.mp4', writer=writer)
     plt.show()
