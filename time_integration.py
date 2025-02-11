@@ -11,4 +11,5 @@ def time_step(Es, As, coord, nele, connec, rho):
         dt_e = L / c
         if dt_e < dt_crit:
             dt_crit = dt_e
+    print(f"element length:",L)
     return dt_crit
