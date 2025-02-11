@@ -4,9 +4,6 @@ import matplotlib.pyplot as plt
 from matplotlib.animation import FuncAnimation
 from matplotlib.collections import LineCollection
 import matplotlib.cm as cm
-import cProfile
-import pstats
-from line_profiler import LineProfiler
 
 from fem_functions import (
     lumped_mass_matrix,
@@ -28,12 +25,12 @@ def run_1d_simulation():
     nnode, ndof, coord, connec, dof_id = geometry_1d(nx, total_length_x) # call geometry function to discretize
     end_node_index_1d = nnode - 1
 
-    Es = np.full(len(connec), E1)   # assign E1 to all bar elements (Pa)
-    As = np.full(len(connec), A1)   # assign A1 to all bar elements (m^2)
+    Es = np.full(len(connec), E1)   # assign E1 to all bar elements (MPa)
+    As = np.full(len(connec), A1)   # assign A1 to all bar elements (mm^2)
 
     # boundary conditions
     B_1d = np.array([0])            # geometrically constrained nodes
-    R_1d = np.array([0])            # applied displacement (m)
+    R_1d = np.array([0])            # applied displacement (mm)
 
     # compute lumped global mass matrix
     M_1d = lumped_mass_matrix(rho, As, coord, nx, ndof, connec, dof_id) # mass matrix (Kg)
@@ -45,23 +42,25 @@ def run_1d_simulation():
     print(f"Total Mass in 1D Bar: {M_total_1D}")
 
     # initialize displacement, velocity, acceleration vectors
-    U_1d = np.zeros(ndof)       # displacement (m)
-    V_half_1d = np.zeros(ndof)  # velocity at n - 1/2 (m/s)
-    a_1d = np.zeros(ndof)       # acceleration (m/s^2)
+    U_1d = np.zeros(ndof)       # displacement (mm)
+    V_half_1d = np.zeros(ndof)  # velocity at n - 1/2 (mm/s)
+    a_1d = np.zeros(ndof)       # acceleration (mm/s^2)
+    
+    V_half_1d[end_node_index_1d] = -1.0  # If only 1 DOF per node
 
     # compute initial acceleration (time = 0)
     F_ext = external_force_1d(ndof, force_value) # external force (N)
     F_int = internal_force_1d(U_1d, Es, As, coord, ndof, nx, connec, dof_id) # internal force (N)
-    a_1d = (F_ext - F_int) / M_1d # acceleration (m/s^2)
+    a_1d = (F_ext - F_int) / M_1d # acceleration (mm/s^2)
 
     # boundary conditions (time = 0)
-    U_1d[B_1d] = R_1d           # displacement (m)
-    V_half_1d[B_1d] = 0.0       # velocity (m/s)
-    a_1d[B_1d] = 0.0            # acceleration (m/s^2)
+    U_1d[B_1d] = R_1d           # displacement (mm)
+    V_half_1d[B_1d] = 0.0       # velocity (mm/s)
+    a_1d[B_1d] = 0.0            # acceleration (mm/s^2)
 
     # time step parameters
     dt_crit_1d = time_step(Es, As, coord, nx, connec, rho) # critical time step (s)
-    dt = dt_crit_1d * 0.9 # scale critical time step to stabilize (s)
+    dt = dt_crit_1d * stability_factor # scale critical time step to stabilize (s)
     num_steps = int(T_total / dt) # number of time steps
     
     # display time integration parameters for bar FEM simulation
@@ -71,18 +70,18 @@ def run_1d_simulation():
     print(f"Total simulation time (T_total): {T_total}")
 
     time = np.linspace(0, T_total, num_steps) # time array (s)
-    U_history_1d = np.zeros((ndof, num_steps)) # displacement history (m)
-    V_half_history_1d = np.zeros((ndof, num_steps)) # velocity history (m/s)
+    U_history_1d = np.zeros((ndof, num_steps)) # displacement history (mm)
+    V_half_history_1d = np.zeros((ndof, num_steps)) # velocity history (mm/s)
 
     # central difference method algorithm
     for n in range(num_steps):
         t = n * dt
 
-        # velocity at n + 1/2 (m/s)
+        # velocity at n + 1/2 (mm/s)
         V_half_1d += dt * a_1d
         V_half_1d[B_1d] = 0.0
 
-        # displacement at n + 1 (m)
+        # displacement at n + 1 (mm)
         U_new_1d = U_1d + dt * V_half_1d
         U_new_1d[B_1d] = R_1d
 
@@ -90,7 +89,7 @@ def run_1d_simulation():
         F_ext = external_force_1d(ndof, force_value)
         F_int = internal_force_1d(U_new_1d, Es, As, coord, ndof, nx, connec, dof_id)
 
-        # acceleration at n + 1 (m/s^2)
+        # acceleration at n + 1 (mm/s^2)
         a_1d = (F_ext - F_int) / M_1d
         a_1d[B_1d] = 0.0
 
@@ -112,7 +111,6 @@ def run_1d_simulation():
     print("Bar FEM simulation complete\n")
     return U_history_1d, V_half_history_1d, time, end_node_index_1d
 
-#@Profile
 def run_2d_simulation():
     nnode, ndof, coord, connec, dof_id = geometry_2d(nx, ny, total_length_x, total_length_y)
     nele = len(connec)
@@ -123,9 +121,9 @@ def run_2d_simulation():
     #print('connec = ', connec)
     #print('dof_id =',dof_id)
 
-    Es = np.full(len(connec), E1)   # assign E1 to all elements (Pa)
+    Es = np.full(len(connec), E1)   # assign E1 to all elements (MPa)
     A1_2d = A1 / ny # correct mass distribution for 2D Lattice
-    As = np.full(len(connec), A1_2d)   # assign A1 to all elements (m^2)
+    As = np.full(len(connec), A1_2d)   # assign A1 to all elements (mm^2)
 
     num_node = len(coord)
     all_nodes = np.arange(num_node)
@@ -159,23 +157,26 @@ def run_2d_simulation():
     print(f"Total Mass in 2D Lattice: {M_total_2D}")
 
     # initialize displacement, velocity, acceleration vectors
-    U_2d = np.zeros(ndof)      # displacement (m)
-    V_half_2d = np.zeros(ndof) # velocity at n - 1/2 (m/s)
-    a_2d = np.zeros(ndof)      # acceleration (m/s^2)
+    U_2d = np.zeros(ndof)      # displacement (mm)
+    V_half_2d = np.zeros(ndof) # velocity at n - 1/2 (mm/s)
+    a_2d = np.zeros(ndof)      # acceleration (mm/s^2)
+
+    for node in right_side_nodes:
+        V_half_2d[2 * node] = -1.0  # x DOF index for that node
 
     # compute initial acceleration (time = 0)
     F_ext = external_force_2d(ndof, right_side_nodes, force_value) # external force (N)
     F_int = internal_force_2d(U_2d, Es, As, coord, ndof, nele, connec, dof_id) # internal force (N)
-    a_2d = (F_ext - F_int) / M_2d # acceleration (m/s^2)
+    a_2d = (F_ext - F_int) / M_2d # acceleration (mm/s^2)
     
     # boundary conditions (time = 0)
-    U_2d[B_2d] = 0.0             # displacement (m)
-    a_2d[B_2d] = 0.0             # velocity (m/s)
-    V_half_2d[B_2d] = 0.0        # acceleration (m/s^2)
+    U_2d[B_2d] = 0.0             # displacement (mm)
+    a_2d[B_2d] = 0.0             # velocity (mm/s)
+    V_half_2d[B_2d] = 0.0        # acceleration (mm/s^2)
 
     # timestep parameters
     dt_crit_2d = time_step(Es, As, coord, nele, connec, rho) # critial time step (s)
-    dt = dt_crit_2d * 0.9 # scale critical timestep for stabilization (s)
+    dt = dt_crit_2d * stability_factor # scale critical timestep for stabilization (s)
     num_steps = int(T_total / dt) # number of time steps
     
     # display time integration parameters for Lattice FEM simulation
@@ -186,7 +187,7 @@ def run_2d_simulation():
 
     time = np.linspace(0, T_total, num_steps)       # time array (s)
     U_history_2d = np.zeros((ndof, num_steps))      # displacement history (m)
-    V_half_history_2d = np.zeros((ndof, num_steps)) # velocity history (m/s)
+    V_half_history_2d = np.zeros((ndof, num_steps)) # velocity history (mms)
 
     # central difference method algorithm
     for n in range(num_steps):
@@ -212,7 +213,7 @@ def run_2d_simulation():
         #     print(f"Internal Force at step {n}:\n", F_int)
         #     print(f"Force Balance at step {n}:\n {force_balance}")
 
-        # acceleration at n + 1 (m/s^2)
+        # acceleration at n + 1 (mm/s^2)
         a_2d = (F_ext - F_int) / M_2d
         a_2d[B_dof] = 0.0
         
@@ -284,34 +285,22 @@ def main():
         time_2d, U_history_2d, V_half_history_2d, middle_node_2d)
 
 if __name__ == "__main__":
-    # profiler = cProfile.Profile()
-    # profiler.enable()
     # applied force parameter for all simulation
-    force_value = -1.0e-1 # applied force (N)
+    force_value = 0 # applied force (N)
     
     # discretization for all simulations
-    nx = 30 # number of elements in x
+    nx = 20 # number of elements in x
     ny = 2 # number of elements in y
-    total_length_x = 20.0 # length of structure in x (m)
-    total_length_y = 2.0 # length of structure in y (m)
-    scale_factor = 0.4
+    total_length_x = 20.0 # length of structure in x (mm)
+    total_length_y = 2.0 # length of structure in y (mm)
+    scale_factor = 1.0
     
     # material properties for all simulations
-    E1 = 3.0        # Young's Modulus (Pa)
-    A1 = 2.0      # Area (m^2)
-    rho = 1.0     # density (kg/m^3)
-    
-    #steel
-    # E1 = 200.0       # Young's Modulus (Pa)
-    # A1 = 0.2         # Area (m^2)
-    # rho = 7850.0     # density (kg/m^3)
+    E1 = 30000.0        # Young's Modulus (MPa)
+    A1 = .0539      # Area (mm^2)
+    rho = 2.4e-6    # density (kg/mm^3)
     
     # timestep parameters for all simulations
-    T_total = 600 # total simulation time (s)
-    
+    T_total = .001 # total simulation time (s)
+    stability_factor = 0.8
     main()
-    
-    # profiler.disable()
-    # stats = pstats.Stats(profiler).sort_stats('cumtime')
-    # stats.print_stats()
-    # stats.dump_stats('profiling_results.prof')
